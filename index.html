@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Transcribe — YouTube video to text</title>
+<meta name="description" content="Paste a YouTube link and get the full transcript in seconds. Copy it or download it as a text file.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Sora:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --midnight: #0f1830;
+    --panel: rgba(15, 24, 48, 0.68);
+    --line: rgba(255, 255, 255, 0.14);
+    --text: #f3f6ff;
+    --muted: #aeb8d9;
+    --amber: #ffc857;
+    --amber-dark: #2a1d00;
+    --danger: #ff8f8f;
+    --head: "Sora", "Segoe UI", system-ui, sans-serif;
+    --body: "DM Sans", "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    min-height: 100vh;
+    font-family: var(--body);
+    color: var(--text);
+    background: linear-gradient(160deg, #1b2a55 0%, #0f1830 55%, #2a1b4d 100%) fixed;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Background image layer (set from JavaScript below) */
+  body::before {
+    content: "";
+    position: fixed; inset: 0; z-index: -2;
+    background: var(--bg-image, none) center / cover no-repeat;
+  }
+  body::after {
+    content: "";
+    position: fixed; inset: 0; z-index: -1;
+    background: linear-gradient(180deg, rgba(15,24,48,.55), rgba(15,24,48,.8));
+  }
+  .wrap { width: min(920px, 100% - 32px); margin: 0 auto; }
+  header { padding: 24px 0; display: flex; align-items: center; gap: 10px; }
+  .logo {
+    width: 36px; height: 36px; border-radius: 10px; background: var(--amber); color: var(--amber-dark);
+    display: grid; place-items: center; font-family: var(--head); font-weight: 800;
+  }
+  .brand { font-family: var(--head); font-weight: 700; font-size: 1.15rem; }
+
+  .hero { padding: 48px 0 28px; text-align: left; }
+  h1 {
+    font-family: var(--head); font-weight: 800; letter-spacing: -0.02em;
+    font-size: clamp(2.2rem, 6.5vw, 4rem); line-height: 1.08; max-width: 14ch;
+  }
+  .sub { margin-top: 18px; max-width: 52ch; color: var(--muted); font-size: 1.1rem; }
+
+  .box {
+    margin-top: 32px; padding: 10px; border-radius: 20px;
+    background: var(--panel); border: 1px solid var(--line);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 20px 60px rgba(0,0,0,.35);
+  }
+  form { display: flex; gap: 10px; flex-wrap: wrap; }
+  .field { flex: 1 1 280px; display: flex; align-items: center; gap: 8px; padding: 0 8px 0 16px;
+    background: rgba(255,255,255,.07); border: 1px solid var(--line); border-radius: 14px; }
+  .field:focus-within { border-color: var(--amber); }
+  input[type=text] {
+    flex: 1; min-width: 0; background: none; border: 0; outline: 0; color: var(--text);
+    font: inherit; font-size: 1rem; padding: 16px 0;
+  }
+  input::placeholder { color: #8c97bd; }
+  button { font: inherit; cursor: pointer; border: 0; }
+  .ghost {
+    background: rgba(255,255,255,.1); color: var(--text); padding: 8px 12px; border-radius: 10px; font-size: .9rem;
+  }
+  .ghost:hover { background: rgba(255,255,255,.18); }
+  .primary {
+    flex: 0 0 auto; background: var(--amber); color: var(--amber-dark); font-weight: 600;
+    padding: 16px 28px; border-radius: 14px; font-size: 1rem; transition: transform .15s;
+  }
+  .primary:hover { transform: translateY(-1px); }
+  .primary:disabled { opacity: .6; cursor: wait; transform: none; }
+  button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+  .msg { margin: 14px 8px 6px; font-size: .95rem; }
+  .msg.error { color: var(--danger); }
+  .msg.info { color: var(--muted); display: flex; align-items: center; gap: 10px; }
+  .spin {
+    width: 18px; height: 18px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,.25); border-top-color: var(--amber);
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .result { margin: 28px 0 60px; border-radius: 20px; overflow: hidden;
+    background: var(--panel); border: 1px solid var(--line);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 20px 60px rgba(0,0,0,.35); }
+  .vid { display: flex; gap: 16px; padding: 18px; align-items: center; border-bottom: 1px solid var(--line); }
+  .vid img { width: 144px; aspect-ratio: 16/9; object-fit: cover; border-radius: 10px; background: #0006; flex: 0 0 auto; }
+  .vid h2 { font-family: var(--head); font-size: 1.1rem; line-height: 1.35; }
+  .stats { color: var(--muted); font-size: .9rem; margin-top: 4px; }
+  .tools { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 18px; border-bottom: 1px solid var(--line); align-items: center; }
+  .tools .spacer { flex: 1; }
+  .switch { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: .92rem; cursor: pointer; }
+  .switch input { accent-color: var(--amber); width: 18px; height: 18px; }
+  .text { padding: 18px; max-height: 62vh; overflow: auto; font-size: 1.02rem; max-width: 100%; }
+  .text p { max-width: 72ch; }
+  .row { display: flex; gap: 14px; padding: 6px 0; max-width: 76ch; }
+  .ts { flex: 0 0 56px; color: var(--amber); font-variant-numeric: tabular-nums; text-decoration: none; font-weight: 500; }
+  .ts:hover { text-decoration: underline; }
+  .toast {
+    position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(20px);
+    background: var(--amber); color: var(--amber-dark); padding: 10px 18px; border-radius: 999px; font-weight: 600;
+    opacity: 0; pointer-events: none; transition: .25s;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%); }
+  footer { padding: 0 0 36px; color: var(--muted); font-size: .85rem; }
+  [hidden] { display: none !important; }
+  @media (max-width: 560px) {
+    .vid { flex-direction: column; align-items: flex-start; }
+    .vid img { width: 100%; }
+    .primary { width: 100%; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="logo" aria-hidden="true">T</div>
+      <span class="brand">Transcribe</span>
+    </header>
+
+    <main>
+      <section class="hero">
+        <h1>Turn any YouTube video into text</h1>
+        <p class="sub">Paste a video link and get the full transcript in seconds. Read it, copy it, or save it as a text file.</p>
+
+        <div class="box">
+          <form id="form" novalidate>
+            <label class="field">
+              <span class="sr" style="position:absolute;left:-9999px">YouTube link</span>
+              <input type="text" id="link" placeholder="https://www.youtube.com/watch?v=..." autocomplete="off" spellcheck="false">
+              <button type="button" class="ghost" id="paste">Paste</button>
+            </label>
+            <button type="submit" class="primary" id="go">Get transcript</button>
+          </form>
+          <div id="status" class="msg" role="status" aria-live="polite" hidden></div>
+        </div>
+      </section>
+
+      <section class="result" id="result" hidden>
+        <div class="vid">
+          <img id="thumb" alt="Video thumbnail">
+          <div>
+            <h2 id="title"></h2>
+            <p class="stats" id="stats"></p>
+          </div>
+        </div>
+        <div class="tools">
+          <label class="switch"><input type="checkbox" id="tsToggle"> Show timestamps</label>
+          <span class="spacer"></span>
+          <button class="ghost" id="copy">Copy text</button>
+          <button class="ghost" id="download">Download .txt</button>
+        </div>
+        <div class="text" id="text"></div>
+      </section>
+    </main>
+
+    <footer>Works with videos that have captions. Not affiliated with YouTube.</footer>
+  </div>
+  <div class="toast" id="toast"></div>
+
+<script>
+  // ====== SETTINGS ======
+  // Put the direct link of your background image here (a link ending in .jpg, .png or .webp).
+  // Right-click the image on Pinterest > "Copy image address". Leave empty to use the built-in gradient.
+  const BACKGROUND_IMAGE = "";
+
+  // Address of the backend function (works on Netlify and with `netlify dev`)
+  const API = "/.netlify/functions/transcript";
+
+  // ====== BACKGROUND ======
+  if (BACKGROUND_IMAGE) {
+    const img = new Image();
+    img.onload = () => document.documentElement.style.setProperty("--bg-image", 'url("' + BACKGROUND_IMAGE + '")');
+    img.src = BACKGROUND_IMAGE;
+  }
+
+  // ====== HELPERS ======
+  const $ = (s) => document.querySelector(s);
+  const state = { id: "", title: "", segments: [] };
+
+  function fmt(sec) {
+    sec = Math.floor(sec);
+    const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+    const ss = String(s).padStart(2, "0");
+    return h ? h + ":" + String(m).padStart(2, "0") + ":" + ss : m + ":" + ss;
+  }
+
+  function toast(msg) {
+    const t = $("#toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toast.timer);
+    toast.timer = setTimeout(() => t.classList.remove("show"), 1800);
+  }
+
+  function setStatus(type, msg) {
+    const el = $("#status");
+    if (!msg) { el.hidden = true; return; }
+    el.hidden = false;
+    el.className = "msg " + type;
+    el.innerHTML = "";
+    if (type === "info") { const s = document.createElement("span"); s.className = "spin"; el.appendChild(s); }
+    el.appendChild(document.createTextNode(msg));
+  }
+
+  function plainText() {
+    if ($("#tsToggle").checked) {
+      return state.segments.map((s) => "[" + fmt(s.start) + "] " + s.text).join("\n");
+    }
+    return state.segments.map((s) => s.text).join(" ");
+  }
+
+  function render() {
+    const box = $("#text");
+    box.innerHTML = "";
+    if ($("#tsToggle").checked) {
+      state.segments.forEach((s) => {
+        const row = document.createElement("div");
+        row.className = "row";
+        const a = document.createElement("a");
+        a.className = "ts";
+        a.textContent = fmt(s.start);
+        a.href = "https://www.youtube.com/watch?v=" + state.id + "&t=" + Math.floor(s.start) + "s";
+        a.target = "_blank";
+        a.rel = "noopener";
+        const span = document.createElement("span");
+        span.textContent = s.text;
+        row.append(a, span);
+        box.appendChild(row);
+      });
+    } else {
+      const p = document.createElement("p");
+      p.textContent = state.segments.map((s) => s.text).join(" ");
+      box.appendChild(p);
+    }
+  }
+
+  async function copyText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (e) {
+      const ta = document.createElement("textarea");
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      document.execCommand("copy"); ta.remove();
+    }
+  }
+
+  // ====== EVENTS ======
+  $("#paste").addEventListener("click", async () => {
+    try {
+      $("#link").value = (await navigator.clipboard.readText()).trim();
+      $("#link").focus();
+    } catch (e) {
+      toast("Press Ctrl+V (or long-press) to paste");
+      $("#link").focus();
+    }
+  });
+
+  $("#tsToggle").addEventListener("change", render);
+
+  $("#copy").addEventListener("click", async () => {
+    await copyText(plainText());
+    toast("Copied to clipboard");
+  });
+
+  $("#download").addEventListener("click", () => {
+    const blob = new Blob([(state.title ? state.title + "\n\n" : "") + plainText()], { type: "text/plain;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = (state.title || "transcript").replace(/[\\/:*?"<>|]+/g, "").slice(0, 80) + ".txt";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+
+  $("#form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const link = $("#link").value.trim();
+    if (!link) { setStatus("error", "Paste a YouTube link first."); return; }
+
+    const btn = $("#go");
+    btn.disabled = true;
+    btn.textContent = "Working…";
+    $("#result").hidden = true;
+    setStatus("info", "Fetching the transcript…");
+
+    try {
+      const res = await fetch(API + "?url=" + encodeURIComponent(link));
+      let data = null;
+      try { data = await res.json(); } catch (err) {}
+
+      if (!data) {
+        throw new Error("The server function was not found. Deploy the site on Netlify, or run it locally with “netlify dev”.");
+      }
+      if (!res.ok) throw new Error(data.error || "Something went wrong. Please try again.");
+
+      state.id = data.id;
+      state.title = data.title || "YouTube video";
+      state.segments = data.segments;
+
+      $("#thumb").src = "https://i.ytimg.com/vi/" + data.id + "/hqdefault.jpg";
+      $("#title").textContent = state.title;
+      const words = state.segments.reduce((n, s) => n + s.text.split(/\s+/).length, 0);
+      $("#stats").textContent = words.toLocaleString() + " words · " + state.segments.length.toLocaleString() + " lines";
+      render();
+      setStatus("", "");
+      $("#result").hidden = false;
+      $("#result").scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (err) {
+      setStatus("error", err.message || "Something went wrong. Please try again.");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Get transcript";
+    }
+  });
+</script>
+</body>
+              </html>
+              
